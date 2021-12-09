@@ -1,18 +1,18 @@
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/user.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include <errno.h>
-
 
 int main(int argc, char **argv) {
   if (argc <= 3) {
-    printf("Error: Three argument expected (process name & 2 function names)\n");
+    printf(
+        "Error: Three argument expected (process name & 2 function names)\n");
     exit(EXIT_FAILURE);
   }
 
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   }
   waitpid(atoi(pid), 0, 0);
 
-  char* fun = NULL;
+  char *fun = NULL;
   long fun_addr;
 
   {
@@ -58,7 +58,8 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
 
-    for (ssize_t read = getline(&fun, &len, fh); read != -1; read = getline(&fun, &len, fh)) {
+    for (ssize_t read = getline(&fun, &len, fh); read != -1;
+         read = getline(&fun, &len, fh)) {
       fun[read - 1] = 0;
       sscanf(fun, "%lx %c %s", &fun_addr, &type, symbol);
       if (strcmp(symbol, argv[2]) == 0) {
@@ -67,7 +68,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  char* fun_owo = NULL;
+  char *fun_owo = NULL;
   uint fun_addr_owo;
 
   {
@@ -83,7 +84,8 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
     }
 
-    for (ssize_t read = getline(&fun_owo, &len, fh); read != -1; read = getline(&fun_owo, &len, fh)) {
+    for (ssize_t read = getline(&fun_owo, &len, fh); read != -1;
+         read = getline(&fun_owo, &len, fh)) {
       fun_owo[read - 1] = 0;
       sscanf(fun_owo, "%x %c %s", &fun_addr_owo, &type, symbol);
       if (strcmp(symbol, argv[3]) == 0) {
@@ -94,10 +96,6 @@ int main(int argc, char **argv) {
 
   printf("addr 1: %lx\n", fun_addr);
   printf("addr 2: %x\n", fun_addr_owo);
-
-
-
-
 
   char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
   sprintf(addr, "/proc/%s/mem", pid);
@@ -116,7 +114,6 @@ int main(int argc, char **argv) {
   }
   long fte = ftell(fh);
   printf("ftell: %lx\n", fte);
-
 
   // premier remplacement ici
   char sauvegarde[4];
@@ -138,11 +135,6 @@ int main(int argc, char **argv) {
   }
   fclose(fh);
 
-
-
-
-
-
   printf("Wrote trap, call, trap\n");
 
   long trace4 = ptrace(PTRACE_CONT, atoi(pid), 0, 0);
@@ -155,8 +147,6 @@ int main(int argc, char **argv) {
   waitpid(atoi(pid), 0, 0);
 
   printf("arret sur le trap\n");
-
-
 
   struct user_regs_struct data;
 
@@ -172,7 +162,7 @@ int main(int argc, char **argv) {
   ulong emplacement = data.rsp - sizeof(int);
 
   FILE *fh2 = fopen(addr, "r+");
-    if (!fh2) {
+  if (!fh2) {
     fprintf(stdout, "Error : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -208,19 +198,16 @@ int main(int argc, char **argv) {
   printf("emplacement: %x\n", emplacement);
 
   // troisième remplacement ici
-  struct user_regs_struct data;
-  sauvegarde_rax = data.rax;
-  sauvegarde_rdi = data.rdi;
-  sauvegarde_rsp = data.rsp;
-  sauvegarde_rip = data.rip;
+  struct user_regs_struct sauvegarde_data;
+  memcpy(&sauvegarde_data, &data, sizeof(struct user_regs_struct));
+  // sauvegarde_rax = data.rax;
+  // sauvegarde_rdi = data.rdi;
+  // sauvegarde_rsp = data.rsp;
+  // sauvegarde_rip = data.rip;
 
   data.rax = fun_addr_owo;
   data.rdi = emplacement;
   data.rsp = emplacement;
-
-
-
-
 
   long trace3 = ptrace(PTRACE_SETREGS, atoi(pid), 0, &data);
   if (trace3 != 0) {
@@ -242,7 +229,7 @@ int main(int argc, char **argv) {
 
   // Attente sur le deuxième trap
   FILE *fh3 = fopen(addr, "r+");
-    if (!fh3) {
+  if (!fh3) {
     fprintf(stdout, "Error : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -258,9 +245,8 @@ int main(int argc, char **argv) {
   }
   fclose(fh3);
 
-
   FILE *fh4 = fopen(addr, "r+");
-    if (!fh4) {
+  if (!fh4) {
     fprintf(stdout, "Error : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -283,13 +269,12 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  data.rax = sauvegarde_rax;
-  data.rdi = sauvegarde_rdi;
-  data.rsp = sauvegarde_rsp;
-  data.rip = sauvegarde_rip;
+  // data.rax = sauvegarde_rax;
+  // data.rdi = sauvegarde_rdi;
+  // data.rsp = sauvegarde_rsp;
+  // data.rip = sauvegarde_rip;
 
-
-  long trace8 = ptrace(PTRACE_SETREGS, atoi(pid), 0, &data);
+  long trace8 = ptrace(PTRACE_SETREGS, atoi(pid), 0, &sauvegarde_data);
   if (trace8 != 0) {
     printf("Error: ptrace getregs did not succeed (%ld)\n", trace3);
     printf("%d\n", errno);
