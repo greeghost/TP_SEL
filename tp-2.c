@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
   char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
   sprintf(addr, "/proc/%s/mem", pid);
   FILE *fh = fopen(addr, "r+");
-    if (!fh) {
+  if (!fh) {
     fprintf(stdout, "Error : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
@@ -168,7 +168,6 @@ int main(int argc, char **argv) {
   }
 
   printf("a priori we succeeded the getregging uwu\n");
-  sleep(1);
 
   ulong emplacement = data.rsp - sizeof(int);
 
@@ -209,10 +208,12 @@ int main(int argc, char **argv) {
   printf("emplacement: %x\n", emplacement);
 
   // troisième remplacement ici
-  ulong sauvegarde_rax, sauvegarde_rdi, sauvegarde_rsp;
+  struct user_regs_struct data;
   sauvegarde_rax = data.rax;
   sauvegarde_rdi = data.rdi;
   sauvegarde_rsp = data.rsp;
+  sauvegarde_rip = data.rip;
+
   data.rax = fun_addr_owo;
   data.rdi = emplacement;
   data.rsp = emplacement;
@@ -229,7 +230,6 @@ int main(int argc, char **argv) {
   }
 
   printf("a priori we succeeded the setregging ! uwu\n");
-  sleep(1);
 
   long trace5 = ptrace(PTRACE_CONT, atoi(pid), 0, 0);
   if (trace5 != 0) {
@@ -286,6 +286,8 @@ int main(int argc, char **argv) {
   data.rax = sauvegarde_rax;
   data.rdi = sauvegarde_rdi;
   data.rsp = sauvegarde_rsp;
+  data.rip = sauvegarde_rip;
+
 
   long trace8 = ptrace(PTRACE_SETREGS, atoi(pid), 0, &data);
   if (trace8 != 0) {
@@ -294,11 +296,12 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  long trace9 = ptrace(PTRACE_DETACH, atoi(pid), 0, 0);
+  long trace9 = ptrace(PTRACE_CONT, atoi(pid), 0, 0);
   if (trace9 != 0) {
-    printf("Error: ptrace detach did not succeed (%ld)\n", trace1);
+    printf("Error: ptrace cont did not succeed (%ld)\n", trace1);
     exit(EXIT_FAILURE);
   }
+  waitpid(atoi(pid), 0, 0);
 
   exit(EXIT_SUCCESS);
 

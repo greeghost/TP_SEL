@@ -4,6 +4,7 @@
 int posix_memalign(void **memptr, size_t alignment, size_t size);
 
 int foo(int n) {
+  // appel à bar
   printf("foo %d, %p\n", n, foo);
   return n;
 }
@@ -16,8 +17,8 @@ int bar(int* p) {
 
 int main() {
   int n = 0;
-  int q = 42;
-  int* p = &q;
+  // int q = 42;
+  // int* p = &q;
   while (1) {
     foo(n);
     n++;
