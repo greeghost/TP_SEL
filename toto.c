@@ -1,10 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
-
-int posix_memalign(void **memptr, size_t alignment, size_t size);
 
 int foo(int n) {
-  // appel à bar
   printf("foo %d\n", n);
   return n;
 }
