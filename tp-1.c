@@ -65,7 +65,6 @@ uint get_fun_addr(char* pid, char* fun) {
 
 
 void write_at_function(char* pid, uint fun_addr, unsigned char* text, int length) {
-  printf("1\n");
   char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
   sprintf(addr, "/proc/%s/mem", pid);
   FILE *fh = fopen(addr, "r+");
@@ -73,8 +72,6 @@ void write_at_function(char* pid, uint fun_addr, unsigned char* text, int length
     perror("Error while opening proc/pid/mem");
     exit(EXIT_FAILURE);
   }
-
-  printf("1\n");
 
   fseek(fh, fun_addr, 0);
   fwrite(text, 1, length, fh);
@@ -91,7 +88,6 @@ int main(int argc, char **argv) {
 
   char* pid = NULL;
   get_pid_safely(argv[1], &pid);
-  printf("%s\n", pid);
   uint fun_addr = get_fun_addr(pid, argv[2]);
   int pid_int = atoi(pid);
 
