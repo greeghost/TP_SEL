@@ -8,13 +8,13 @@ CFLAGS  ?= -W -Wall -Wextra -pedantic
 all: challenge1 challenge2
 
 challenge1: toto
-	$(CC) $(CFLAGS)  tp-1.c -o challenge1
+	$(CC) $(CFLAGS) -o challenge1 tp-1.c dependencies.c
 
 challenge2: toto
-	$(CC) $(CFLAGS)  tp-2.c -o challenge2
+	$(CC) $(CFLAGS) -o challenge2 tp-2.c dependencies.c
 
 toto:
 	$(CC) $(CFLAGS)  toto.c -o toto
 
 clean:
-	rm chall* toto
+	rm -f challenge1 challenge2 toto
