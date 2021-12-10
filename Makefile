@@ -5,7 +5,7 @@ CC      ?= gcc
 CFLAGS  ?= -W -Wall -Wextra -pedantic
 
 
-all: challenge1 challenge2
+all: clean challenge1 challenge2
 
 challenge1: toto
 	$(CC) $(CFLAGS) -o challenge1 tp-1.c dependencies.c
