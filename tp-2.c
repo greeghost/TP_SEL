@@ -9,22 +9,17 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "dependencies.h"
+#include "tp-2.h"
 
-int main(int argc, char **argv) {
-  if (argc <= 3) {
-    printf(
-        "Error: Three argument expected (process name & 2 function names)\n");
-    exit(EXIT_FAILURE);
-  }
-
+int tp2(char* procname, char* target, char* intruder) {
   char* pid = NULL;
-  get_pid(argv[1], &pid);
+  get_pid(procname, &pid);
 
   attach(atoi(pid));
   waitpid(atoi(pid), 0, 0);
 
-  uint target_addr = get_fun_addr(pid, argv[2]);
-  uint intruder_addr = get_fun_addr(pid, argv[3]);
+  uint target_addr = get_fun_addr(pid, target);
+  uint intruder_addr = get_fun_addr(pid, intruder);
 
   // rajout des instructions d'appel de fonction
   unsigned char trapcalltrap[4] = {0xCC, 0xFF, 0xD0, 0xCC};
@@ -68,6 +63,18 @@ int main(int argc, char **argv) {
 
   cont(atoi(pid));
   free(pid);
+
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if (argc <= 3) {
+    printf(
+        "Error: Three argument expected (process name & 2 function names)\n");
+    exit(EXIT_FAILURE);
+  }
+
+  tp2(argv[1], argv[2], argv[3]);
 
   printf("done!\n");
 
