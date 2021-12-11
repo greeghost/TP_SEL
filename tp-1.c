@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
   }
 
   char* pid = NULL;
-  get_pid_safely(argv[1], &pid);
+  get_pid(argv[1], &pid);
   uint fun_addr = get_fun_addr(pid, argv[2]);
   int pid_int = atoi(pid);
 
@@ -19,8 +19,10 @@ int main(int argc, char **argv) {
   waitpid(pid_int, 0, 0);
 
   unsigned char trap = 0xCC;
-  write_at_function(pid, fun_addr, &trap, 1);
+  unsigned char* useless_return;
+  useless_return = write_at_function(pid, fun_addr, &trap, 1);
 
+  free(useless_return);
   free(pid);
   exit(EXIT_SUCCESS);
 }

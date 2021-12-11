@@ -3,14 +3,12 @@
 #include <string.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
 #include <errno.h>
 #include "dependencies.h"
 
 
 // Récupération via pgrep du pid du processus de nom procname, et rangement à l'adresse pid
-void get_pid_safely(char* procname, char** pid) {
+void get_pid(char* procname, char** pid) {
   char cmd[strlen("pgrep ") + strlen(procname)];
   sprintf(cmd, "pgrep %s", procname);
 
@@ -30,11 +28,39 @@ void get_pid_safely(char* procname, char** pid) {
 long attach(int pid) {
   long trace = ptrace(PTRACE_ATTACH, pid, 0, 0);
   if (trace != 0) {
+    perror("Error: ptrace attach did not succeed:");
+    exit(EXIT_FAILURE);
+  }
+  return trace;
+}
+
+long cont(int pid) {
+  long trace = ptrace(PTRACE_CONT, pid, 0, 0);
+  if (trace != 0) {
     perror("Error: ptrace cont did not succeed:");
     exit(EXIT_FAILURE);
   }
   return trace;
 }
+
+long getregs(int pid, void* data) {
+  long trace = ptrace(PTRACE_GETREGS, pid, 0, data);
+  if (trace != 0) {
+    perror("Error: ptrace cont did not succeed:");
+    exit(EXIT_FAILURE);
+  }
+  return trace;
+}
+
+long setregs(int pid, void* data) {
+  long trace = ptrace(PTRACE_SETREGS, pid, 0, data);
+  if (trace != 0) {
+    perror("Error: ptrace cont did not succeed:");
+    exit(EXIT_FAILURE);
+  }
+  return trace;
+}
+
 
 
 // Recuperation via nm de l'adresse d'une fonction
@@ -64,18 +90,27 @@ uint get_fun_addr(char* pid, char* fun) {
   return fun_addr;
 }
 
-// write instruction at the beginning of a function, erasing what is already there
-void write_at_function(char* pid, uint fun_addr, unsigned char* text, int length) {
-  char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
-  sprintf(addr, "/proc/%s/mem", pid);
-  FILE *fh = fopen(addr, "r+");
-    if (!fh) {
-    perror("Error while opening proc/pid/mem");
+unsigned char* write_in_file(char* file_addr, uint pos, unsigned char* text, int length) {
+  FILE* fh = fopen(file_addr, "r+");
+  if (!fh) {
+    perror("Error when opening file");
     exit(EXIT_FAILURE);
   }
 
-  fseek(fh, fun_addr, 0);
-  fwrite(text, 1, length, fh);
+  fseek(fh, pos, 0);
 
+  unsigned char* sauvegarde = malloc(length * sizeof(unsigned char));
+
+  fread(sauvegarde, 1, length, fh);
+  fseek(fh, pos, 0);
+  fwrite(text, 1, length, fh);
   fclose(fh);
+  return sauvegarde;
+}
+
+unsigned char* write_at_function(char* pid, uint fun_addr, unsigned char* text, int length) {
+  char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
+  sprintf(addr, "/proc/%s/mem", pid);
+
+  return write_in_file(addr, fun_addr, text, length);
 }
