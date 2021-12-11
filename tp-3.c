@@ -6,301 +6,160 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/user.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <errno.h>
-
+#include "dependencies.h"
+#include "tp-2.h"
 
 int main(int argc, char **argv) {
   if (argc <= 3) {
-    printf("Error: Three argument expected (process name & 2 function names)\n");
+    printf("Error: Three argument expected (process name, function name, text)\n");
     exit(EXIT_FAILURE);
   }
 
   char *pid = NULL;
+  get_pid(argv[1], &pid);
 
-  // Recuperation via pgrep du pid du processus à tracer
-  {
-    char cmd[strlen("pgrep " + strlen(argv[1]))];
-    sprintf(cmd, "pgrep %s", argv[1]);
-    FILE *fh = popen(cmd, "r");
-    size_t len;
-    ssize_t read;
-
-    if (fh == NULL) {
-      exit(EXIT_FAILURE);
-    }
-
-    read = getline(&pid, &len, fh);
-    pid[read - 1] = 0; // virer le \n à la fin
-  }
-
-  printf("pid: %d\n", atoi(pid));
-  long trace1 = ptrace(PTRACE_ATTACH, atoi(pid), 0, 0);
-  if (trace1 != 0) {
-    printf("Error: ptrace attach did not succeed (%ld)\n", trace1);
-    exit(EXIT_FAILURE);
-  }
+  attach(atoi(pid));
   waitpid(atoi(pid), 0, 0);
 
-  char* fun = NULL;
-  long fun_addr;
 
-  {
-    char cmd[strlen("nm /proc/" + strlen(pid) + strlen("/exe"))];
-    sprintf(cmd, "nm /proc/%s/exe", pid);
-    FILE *fh = popen(cmd, "r");
-    size_t len;
+  char addr_maps[strlen("/proc/") + strlen(pid) + strlen("/maps") + 1];
+  sprintf(addr_maps, "/proc/%s/maps", pid);
 
-    char type;
-    char symbol[64]; // a ameliorer
-
-    if (fh == NULL) {
-      exit(EXIT_FAILURE);
-    }
-
-    for (ssize_t read = getline(&fun, &len, fh); read != -1; read = getline(&fun, &len, fh)) {
-      fun[read - 1] = 0;
-      sscanf(fun, "%lx %c %s", &fun_addr, &type, symbol);
-      if (strcmp(symbol, argv[2]) == 0) {
-        break;
-      }
-    }
-  }
-
-  char* fun_owo = NULL;
-  uint fun_addr_owo;
-
-  {
-    char cmd[strlen("nm /proc/" + strlen(pid) + strlen("/exe"))];
-    sprintf(cmd, "nm /proc/%s/exe", pid);
-    FILE *fh = popen(cmd, "r");
-    size_t len;
-
-    char type;
-    char symbol[64]; // a ameliorer
-
-    if (fh == NULL) {
-      exit(EXIT_FAILURE);
-    }
-
-    for (ssize_t read = getline(&fun_owo, &len, fh); read != -1; read = getline(&fun_owo, &len, fh)) {
-      fun_owo[read - 1] = 0;
-      sscanf(fun_owo, "%x %c %s", &fun_addr_owo, &type, symbol);
-      if (strcmp(symbol, argv[3]) == 0) {
-        break;
-      }
-    }
-  }
-
-  printf("addr 1: %lx\n", fun_addr);
-  printf("addr 2: %x\n", fun_addr_owo);
-
-
-
-
-
-  char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
-  sprintf(addr, "/proc/%s/mem", pid);
-  FILE *fh = fopen(addr, "r+");
-    if (!fh) {
-    fprintf(stdout, "Error : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  printf("fh: %p\n", fh);
-
-  // trapping
-  int fsee = fseek(fh, fun_addr, SEEK_SET);
-  if (fsee != 0) {
-    printf("error fseek\n");
-    exit(EXIT_FAILURE);
-  }
-  long fte = ftell(fh);
-  printf("ftell: %lx\n", fte);
-
-
-  // premier remplacement ici
-  char sauvegarde[4];
-  int frea = fread(sauvegarde, 1, 4, fh);
-  if (frea != 4) {
-    perror("Error fread : ");
-    exit(1);
-  }
-  int fsee4 = fseek(fh, fun_addr, SEEK_SET);
-  if (fsee4 != 0) {
-    printf("error fseek\n");
-    exit(EXIT_FAILURE);
-  }
-  char trapcalltrap[4] = {0xCC, 0xFF, 0xD0, 0xCC};
-  int fwri = fwrite(trapcalltrap, 1, 4, fh);
-  if (fwri != 4) {
-    perror("Error fwrite : ");
-    exit(1);
-  }
-  fclose(fh);
-
-
-
-
-
-
-  printf("Wrote trap, call, trap\n");
-
-  long trace4 = ptrace(PTRACE_CONT, atoi(pid), 0, 0);
-  if (trace4 != 0) {
-    printf("Error: ptrace cont did not succeed (%ld)\n", trace4);
-    printf("%d\n", errno);
+  char find_libc[strlen("cat /proc/" + strlen(pid) + strlen("/maps | grep r-xp | grep libc"))];
+  sprintf(find_libc, "cat /proc/%s/maps | grep r-xp | grep libc", pid);
+  FILE *fh_libc = popen(find_libc, "r");
+  if (fh_libc == NULL) {
     exit(EXIT_FAILURE);
   }
 
+  char* line = NULL;
+  size_t length;
+
+  ssize_t read_libc = getline(&line, &length, fh_libc);
+
+  uint start_libc;
+  char* leftovers;
+  char* addr_libc;
+  sscanf(line, "%x-%s/usr%s", &start_libc, leftovers, addr_libc);
+
+  printf("start_libc: %x\n, /usr%s", start_libc, addr_libc);
+
+  int addr_memalign;
+  int addr_mprotect;
+
+  char find_funcs[strlen("nm /usr") + strlen(addr_libc)];
+  sprintf(find_funcs, "nm /usr%s", addr_libc);
+  FILE *fh_funcs = popen(find_funcs, "r");
+  if (fh_funcs == NULL) {
+    exit(EXIT_FAILURE);
+  }
+  size_t len;
+
+  long fun_addr0;
+  char type0;
+  char symbol0[64]; // a ameliorer
+
+  if (fh_funcs == NULL) {
+    exit(EXIT_FAILURE);
+  }
+
+  char* fun;
+  for (ssize_t read = getline(&fun, &len, fh_funcs); read != -1; read = getline(&fun, &len, fh_funcs)) {
+    fun[read - 1] = 0;
+    sscanf(fun, "%lx %c %s", &fun_addr0, &type0, symbol0);
+    if (strcmp(symbol0, "posix_memalign") == 0) {
+      addr_memalign = fun_addr0;
+    }
+    if (strcmp(symbol0, "mprotect") == 0) {
+      addr_mprotect = fun_addr0;
+    }
+  }
+
+  // récupérer la taille d'une page via getpagesize
+  int pagesize = getpagesize();
+
+
+
+
+  // Utiliser le challenge 2 pour appeler posix_memalign(p, pagesize, espace qu'on veut (128 octets par exemple))
+  uint target_addr = get_fun_addr(pid, argv[2]);
+  uint intruder_addr = addr_memalign;
+
+  // rajout des instructions d'appel de fonction
+  unsigned char trapcalltrap[7] = {0xCC, 0xFF, 0xD0, 0xCC, 0xFF, 0xD0, 0xCC};
+  unsigned char* sauvegarde;
+  sauvegarde = write_at_function(pid, target_addr, trapcalltrap, 7);
+
+  cont(atoi(pid));
   waitpid(atoi(pid), 0, 0);
-
-  printf("arret sur le trap\n");
-
-
 
   struct user_regs_struct data;
+  getregs(atoi(pid), &data);
+  ulong emplacement = data.rsp - sizeof(void*);
 
-  long trace2 = ptrace(PTRACE_GETREGS, atoi(pid), 0, &data);
-  if (trace2 != 0) {
-    printf("Error: ptrace getregs did not succeed (%ld)\n", trace2);
-    printf("%d\n", errno);
-    exit(EXIT_FAILURE);
-  }
+  // insertion des données que l'on va appeler dans la fonction
+  char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
+  sprintf(addr, "/proc/%s/mem", pid);
+  void* result_ptr;
+  free(write_in_file(addr, emplacement, (unsigned char*) result_ptr, sizeof(void*)));
 
-  printf("a priori we succeeded the getregging uwu\n");
-  sleep(1);
+  // modification des valeurs des registres
+  struct user_regs_struct sauvegarde_data;
+  memcpy(&sauvegarde_data, &data, sizeof(struct user_regs_struct));
 
-  ulong emplacement = data.rsp - sizeof(int);
 
-  FILE *fh2 = fopen(addr, "r+");
-    if (!fh2) {
-    fprintf(stdout, "Error : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  printf("fh2: %p\n", fh2);
-
-  int fsee2 = fseek(fh2, emplacement, SEEK_SET);
-  if (fsee2 != 0) {
-    printf("error fseek\n");
-    exit(EXIT_FAILURE);
-  }
-
-  // deuxieme remplacement ici
-  int sauvegarde2[4];
-  int read_sauvegarde_pointeur = fread(sauvegarde2, sizeof(int), 1, fh);
-  if (read_sauvegarde_pointeur != 1) {
-    perror("Error fread : ");
-    exit(1);
-  }
-  int fsee5 = fseek(fh, emplacement, SEEK_SET);
-  if (fsee5 != 0) {
-    printf("error fseek\n");
-    exit(EXIT_FAILURE);
-  }
-  int fortytwo[1] = {42};
-  int fwri2 = fwrite(fortytwo, sizeof(int), 1, fh2);
-  if (fwri2 != 1) {
-    perror("Error fwrite : ");
-    exit(1);
-  }
-
-  fclose(fh2);
-
-  printf("emplacement: %x\n", emplacement);
-
-  // troisième remplacement ici
-  ulong sauvegarde_rax, sauvegarde_rdi, sauvegarde_rsp;
-  sauvegarde_rax = data.rax;
-  sauvegarde_rdi = data.rdi;
-  sauvegarde_rsp = data.rsp;
-  data.rax = fun_addr_owo;
-  data.rdi = emplacement;
+  // mise à jour des registres pour appeler la fonction intrus
+  data.rax = intruder_addr;
   data.rsp = emplacement;
 
-
-
-
-
-  long trace3 = ptrace(PTRACE_SETREGS, atoi(pid), 0, &data);
-  if (trace3 != 0) {
-    printf("Error: ptrace getregs did not succeed (%ld)\n", trace3);
-    printf("%d\n", errno);
-    exit(EXIT_FAILURE);
-  }
-
-  printf("a priori we succeeded the setregging ! uwu\n");
-  sleep(1);
-
-  long trace5 = ptrace(PTRACE_CONT, atoi(pid), 0, 0);
-  if (trace5 != 0) {
-    printf("Error: ptrace cont did not succeed (%ld)\n", trace4);
-    printf("%d\n", errno);
-    exit(EXIT_FAILURE);
-  }
+  data.rdi = emplacement; // premier argument: &result_ptr
+  data.rsi = pagesize; // deuxième argument:
+  data.rdx = 128; // troisième argument: (taille du texte écrit)
+  setregs(atoi(pid), &data);
+  cont(atoi(pid));
 
   waitpid(atoi(pid), 0, 0);
 
-  // Attente sur le deuxième trap
-  FILE *fh3 = fopen(addr, "r+");
-    if (!fh3) {
-    fprintf(stdout, "Error : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  int fsee3 = fseek(fh3, fun_addr, SEEK_SET);
-  if (fsee3 != 0) {
-    printf("error fseek\n");
-    exit(EXIT_FAILURE);
-  }
-  int fwri3 = fwrite(sauvegarde, 1, 4, fh2);
-  if (fwri3 != 4) {
-    perror("Error fwrite : ");
-    exit(1);
-  }
-  fclose(fh3);
+  result_ptr = *((void **) data.rax);
+
+  // récupération de l'état initial du programme
+  setregs(atoi(pid), &sauvegarde_data);
 
 
-  FILE *fh4 = fopen(addr, "r+");
-    if (!fh4) {
-    fprintf(stdout, "Error : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-  int fsee6 = fseek(fh4, emplacement, SEEK_SET);
-  if (fsee6 != 0) {
-    printf("error fseek\n");
-    exit(EXIT_FAILURE);
-  }
-  int fwri4 = fwrite(sauvegarde2, sizeof(int), 1, fh4);
-  if (fwri4 != 1) {
-    perror("Error fwrite : ");
-    exit(1);
-  }
-  fclose(fh4);
 
-  long trace7 = ptrace(PTRACE_GETREGS, atoi(pid), 0, &data);
-  if (trace7 != 0) {
-    printf("Error: ptrace getregs did not succeed (%ld)\n", trace2);
-    printf("%d\n", errno);
-    exit(EXIT_FAILURE);
-  }
 
-  data.rax = sauvegarde_rax;
-  data.rdi = sauvegarde_rdi;
-  data.rsp = sauvegarde_rsp;
+  // Utiliser le challenge 2 pour appeler mprotect sur le pointeur p
+  uint protect_intruder_addr = addr_mprotect;
+  // rajout des instructions d'appel de fonction
+  getregs(atoi(pid), &data);
+  // modification des valeurs des registres
+  memcpy(&sauvegarde_data, &data, sizeof(struct user_regs_struct));
 
-  long trace8 = ptrace(PTRACE_SETREGS, atoi(pid), 0, &data);
-  if (trace8 != 0) {
-    printf("Error: ptrace getregs did not succeed (%ld)\n", trace3);
-    printf("%d\n", errno);
-    exit(EXIT_FAILURE);
-  }
+  // mise à jour des registres pour appeler la fonction intrus
+  data.rax = protect_intruder_addr;
+  data.rdi = (long long unsigned int) result_ptr; // premier argument: result_ptr
+  data.rsi = sizeof(void *); // deuxième argument: sizeof(void *)
+  data.rdx = PROT_READ && PROT_WRITE && PROT_EXEC; // troisième argument: premissions
+  setregs(atoi(pid), &data);
+  cont(atoi(pid));
+  waitpid(atoi(pid), 0, 0);
 
-  long trace9 = ptrace(PTRACE_DETACH, atoi(pid), 0, 0);
-  if (trace9 != 0) {
-    printf("Error: ptrace detach did not succeed (%ld)\n", trace1);
-    exit(EXIT_FAILURE);
-  }
+  // récupération de l'état initial du programme
+  setregs(atoi(pid), &sauvegarde_data);
 
-  exit(EXIT_SUCCESS);
 
+  // TODO: Écrire le code cache à l'emplacement pointé
+  write_in_file(addr, (unsigned int) result_ptr, argv[3], strlen(argv[3]));
+
+
+
+
+  free(write_at_function(pid, target_addr, sauvegarde, 7));
+  free(sauvegarde);
+  cont(atoi(pid));
+  free(pid);
   return 0;
 }

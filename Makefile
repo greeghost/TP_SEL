@@ -1,11 +1,12 @@
 # Indiquer quel compilateur est à utiliser
-CC      ?= gcc
+CC       ?= gcc
 
 # Spécifier les options du compilateur
-CFLAGS  ?= -W -Wall -Wextra -pedantic
+CFLAGS   ?= -W -Wall -Wextra -pedantic
 
+BINARIES ?= challenge1 challenge2 toto
 
-all: clean challenge1 challenge2
+all: clean $(BINARIES)
 
 challenge1: toto
 	$(CC) $(CFLAGS) -o challenge1 tp-1.c dependencies.c
@@ -13,8 +14,11 @@ challenge1: toto
 challenge2: toto
 	$(CC) $(CFLAGS) -o challenge2 tp-2.c dependencies.c
 
+challenge3: toto
+	$(CC) $(CFLAGS) -o challenge3 tp-3.c dependencies.c tp2.c
+
 toto:
 	$(CC) $(CFLAGS)  toto.c -o toto
 
 clean:
-	rm -f challenge1 challenge2 toto
+	rm -f $(BINARIES) challenge3
