@@ -34,11 +34,10 @@ int tp2(char* procname, char* target, char* intruder) {
   ulong emplacement = data.rsp - sizeof(int);
 
   // insertion des données que l'on va appeler dans la fonction
-  unsigned char* sauvegarde2;
   char addr[strlen("/proc/") + strlen(pid) + strlen("/mem") + 1];
   sprintf(addr, "/proc/%s/mem", pid);
   int fortytwo[1] = {42};
-  sauvegarde2 = write_in_file(addr, emplacement, (unsigned char*) fortytwo, sizeof(int));
+  free(write_in_file(addr, emplacement, (unsigned char*) fortytwo, sizeof(int)));
 
   // modification des valeurs des registres
   struct user_regs_struct sauvegarde_data;
@@ -57,8 +56,6 @@ int tp2(char* procname, char* target, char* intruder) {
   // récupération de l'état initial du programme
   free(write_at_function(pid, target_addr, sauvegarde, 4));
   free(sauvegarde);
-  free(write_in_file(addr, emplacement, sauvegarde2, 1));
-  free(sauvegarde2);
   setregs(atoi(pid), &sauvegarde_data);
 
   cont(atoi(pid));

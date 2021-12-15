@@ -15,7 +15,7 @@ challenge2: toto
 	$(CC) $(CFLAGS) -o challenge2 tp-2.c dependencies.c
 
 challenge3: toto
-	$(CC) $(CFLAGS) -o challenge3 tp-3.c dependencies.c tp2.c
+	$(CC) $(CFLAGS) -o challenge3 tp-3.c dependencies.c
 
 toto:
 	$(CC) $(CFLAGS)  toto.c -o toto
